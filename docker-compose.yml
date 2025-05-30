@@ -1,5 +1,3 @@
-version: "3.5"
-
 services:
   floto:
     container_name: floto_web
@@ -24,6 +22,8 @@ services:
       - db
     build:
       dockerfile: Dockerfile
+    networks:
+      - k3d-floto-dev
 
   db:
     container_name: floto_db
@@ -37,9 +37,13 @@ services:
     volumes:
       - ./db:/docker-entrypoint-initdb.d
       - ./data:/var/lib/mysql
+    networks:
+      - k3d-floto-dev
 
   redis: # Used for celery tasks
     image: redis:alpine
+    networks:
+      - k3d-floto-dev
 
   celery:
     container_name: floto_tasks
@@ -56,7 +60,13 @@ services:
     depends_on:
       - db
       - redis
+    networks:
+      - k3d-floto-dev
 
 
 volumes:
   static:
+
+networks:
+  k3d-floto-dev:
+    external: true
