@@ -1,6 +1,7 @@
 from collections import defaultdict
+from croniter import croniter
 from rest_framework.exceptions import ValidationError
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 from floto.api import models
 
@@ -64,6 +65,53 @@ def parse_advanced_timing_args(args):
     ]
 
 
+def parse_periodic_timing_string(args):
+    # args should be:
+    # - schedule - a cron-like string
+    # - end - required end time
+    start = datetime.now(timezone.utc)
+    end = None
+    schedule = None
+    duration_minutes = 0
+    duration_hours = 0
+    for arg in args:
+        parts = arg.split("=")
+        # Note, we replace "Z" with +00:00 due to different iso formats
+        if parts[0] == "end":
+            end = datetime.fromisoformat(parts[1].replace("Z", "+00:00"))
+        if parts[0] == "start":
+            start = datetime.fromisoformat(parts[1].replace("Z", "+00:00"))
+        if parts[0] == "schedule":
+            schedule = parts[1]
+        if parts[0] == "minutes":
+            duration_minutes = int(parts[1])
+        if parts[0] == "hours":
+            duration_hours = int(parts[1])
+
+    if not end:
+        raise ValidationError("End time must be included with periodic timing")
+    if not schedule:
+        raise ValidationError("Schedule must be included with periodic timing")
+    duration = timedelta(minutes=duration_minutes, hours=duration_hours)
+    if duration.total_seconds() < 60:
+        raise ValidationError("Duration must be at least 60 seconds")
+
+    timeslots = []
+    last = start
+    iter = croniter(schedule, start)
+    while last <= end:
+        LOG.info("last_start: %s, end: %s", last, end)
+        last_start = iter.get_next(datetime, last)
+        last = last_start + duration
+        timeslots.append(
+            {
+                "start": last_start,
+                "stop": last,
+            }
+        )
+    return timeslots
+
+
 def parse_timing_string(value):
     """
     Parse the given timing string into a list of (start, end) tuples
@@ -79,6 +127,8 @@ def parse_timing_string(value):
         ]
     elif timing_type == "type=advanced":
         return parse_advanced_timing_args(args)
+    elif timing_type == "type=periodic":
+        return parse_periodic_timing_string(args)
     else:
         raise ValidationError(f"Invalid timing string {value}")
 

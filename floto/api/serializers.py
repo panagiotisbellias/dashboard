@@ -245,6 +245,7 @@ class JobSerializer(CreatedByUserSerializer):
                     timing=db_timing,
                     status=models.Event.Status.PENDING,
                 )
+                # TODO tear down events
 
         res = util.parse_timings(
             timings_data, devices_data, validated_data["application"].uuid

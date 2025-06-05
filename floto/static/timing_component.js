@@ -4,8 +4,14 @@ var TimingComponent = {
     let on_demand_model = ref({
       "disable_add": true
     })
-    let advanced_reservation_model = ref({
+    let advanced_reservation_model_end = ref({
       "disable_add": true,
+    })
+    let advanced_reservation_model_start = ref({})
+    let periodic_model = ref({
+      disable_add: true,
+      schedule: "*/30 * * * *",
+      duration_minutes: 10,
     })
     return {
       "types": [
@@ -17,9 +23,16 @@ var TimingComponent = {
           "label": "In advance",
           "value": "advanced",
         },
+        {
+          "label": "Periodic",
+          "value": "periodic",
+        },
+
       ],
       new_type: ref("on_demand"),
-      on_demand_model, advanced_reservation_model,
+      on_demand_model,
+      advanced_reservation_model_end, advanced_reservation_model_start,
+      periodic_model,
       timings: props.modelValue,
       delete_item(str) {
         let index = props.modelValue.indexOf(str)
@@ -35,48 +48,48 @@ var TimingComponent = {
       },
       add_advanced() {
         // Encode the date objects with the ISO timezone.
-        let s = new Date(advanced_reservation_model.value.start).toISOString()
-        let e = new Date(advanced_reservation_model.value.end).toISOString()
+        // TODO
+
+        let start_d = advanced_reservation_model_start.value?.date
+        let start_t = advanced_reservation_model_start.value?.time
+        let s = new Date(`${start_d} ${start_t}`).toISOString()
+
+        let end_d = advanced_reservation_model_end.value?.date
+        let end_t = advanced_reservation_model_end.value?.time
+        let e = new Date(`${end_d} ${end_t}`).toISOString()
+
         let str = `type=advanced,start=${s},end=${e}`
         props.modelValue.push(str)
         ctx.emit('update:modelValue', props.modelValue)
       },
-      expires_in_calculation: function () {
-        let d = on_demand_model.value?.date
-        on_demand_model.value.disable_add = true
-        if (d) {
-          let diff = Date.parse(d) - Date.now()
-          if (diff > 0) {
-            on_demand_model.value.disable_add = false
+      add_periodic() {
+        let end_d = advanced_reservation_model_end.value?.date
+        let end_t = advanced_reservation_model_end.value?.time
+        let e = new Date(`${end_d} ${end_t}`).toISOString()
 
-            on_demand_model.value.days = Math.floor(diff / 1000 / 60 / 60 / 24);
-            diff -= on_demand_model.value.days * 1000 * 60 * 60 * 24
-
-            on_demand_model.value.hours = Math.floor(diff / 1000 / 60 / 60);
-            diff -= on_demand_model.value.hours * 1000 * 60 * 60
-
-            on_demand_model.value.minutes = Math.floor(diff / 1000 / 60);
-            diff -= on_demand_model.value.minutes * 1000 * 60
-
-            return `Expires in ${on_demand_model.value.days} days, ${on_demand_model.value.hours} hours, ${on_demand_model.value.minutes} minutes.`
-          } else {
-            return "Date cannot be in the past."
-          }
-        } else {
-          return "Expiration date not set."
-        }
+        let str = `type=periodic,end=${e},minutes=${periodic_model.value.duration_minutes},schedule=${periodic_model.value.schedule}`
+        props.modelValue.push(str)
+        ctx.emit('update:modelValue', props.modelValue)
       },
-      advanced_calculation: function () {
-        advanced_reservation_model.value.disable_add = true
-        let s = Date.parse(advanced_reservation_model.value?.start)
-        let e = Date.parse(advanced_reservation_model.value?.end)
-        if (s && e) {
+      model_expires_in: function (model, model_start){
+        let s = Date.now()
+        if (model_start) {
+          let d = model_start.value?.date
+          let t = model_start.value?.time
+          if (d && t) {
+            s = Date.parse(`${d} ${t}`)
+          }
+        }
+        let d = model.value?.date
+        let t = model.value?.time
+        model.value.disable_add = true
+        if (d && t) {
+          let e = Date.parse(`${d} ${t}`)
           let diff = e - s
-          // Check
           if (e < Date.now()) {
             return "End date can not be in the past."
           } else if (diff > 0) {
-            advanced_reservation_model.value.disable_add = false
+            model.value.disable_add = false
             let days = Math.floor(diff / 1000 / 60 / 60 / 24);
             diff -= days * 1000 * 60 * 60 * 24
 
@@ -86,16 +99,30 @@ var TimingComponent = {
             let minutes = Math.floor(diff / 1000 / 60);
             diff -= minutes * 1000 * 60
 
-            return `Runs for ${days} days, ${hours} hours, ${minutes} minutes, beginning on ${advanced_reservation_model.value?.start} local time.`
+            model.value.days = days;
+            model.value.hours = hours;
+            model.value.minutes = minutes;
+
+            return `Runs for ${days} days, ${hours} hours, ${minutes} minutes, beginning at ${new Date(s)}.`
           } else {
             return "Start date must be before end date."
           }
-        } else if (!s) {
-          return "Start date not set."
         } else {
-          return "End date not set"
+          return "Expiration date not set."
         }
-      }
+      },
+      expires_in_calculation: function () {
+        return this.model_expires_in(on_demand_model)
+      },
+      advanced_calculation: function () {
+        return this.model_expires_in(
+          advanced_reservation_model_end,
+          advanced_reservation_model_start
+        )
+      },
+      periodic_expires_in_calculation: function () {
+        return this.model_expires_in(periodic_model)
+      },
     }
   },
   template: `
@@ -132,6 +159,7 @@ var TimingComponent = {
           <q-tabs v-model="new_type">
             <q-tab label="On-Demand" name="on_demand" />
             <q-tab label="In-Advance" name="advanced" />
+            <q-tab label="Periodic" name="periodic" />
           </q-tabs>
 
           <q-tab-panels v-model="new_type">
@@ -151,7 +179,7 @@ var TimingComponent = {
                             <q-date today-btn v-model="on_demand_model.date" mask="YYYY-MM-DD"></q-date>
                           </div>
                           <div>
-                            <q-time now-btn v-model="on_demand_model.date" mask="YYYY-MM-DD HH:mm"></q-time>
+                            <q-time now-btn v-model="on_demand_model.time" mask="hh:mm A"></q-time>
                           </div>
                         </div>
                       </q-popup-proxy>
@@ -177,32 +205,32 @@ var TimingComponent = {
                 This will run your application a given start time to an end time.
               </p>
               <div class="q-gutter-md row items-start">
-                <q-input filled v-model="advanced_reservation_model.start" label="Start">
+                <q-input filled v-model="advanced_reservation_model_start.date" label="Start">
                   <template v-slot:append>
                     <q-icon name="access_time" class="cursor-pointer">
                       <q-popup-proxy cover>
                         <div class="row q-gutter-md">
                           <div>
-                            <q-date today-btn v-model="advanced_reservation_model.start" mask="YYYY-MM-DD"></q-date>
+                            <q-date today-btn v-model="advanced_reservation_model_start.date" mask="YYYY-MM-DD"></q-date>
                           </div>
                           <div>
-                            <q-time now-btn v-model="advanced_reservation_model.start" mask="YYYY-MM-DD HH:mm"></q-time>
+                            <q-time now-btn v-model="advanced_reservation_model_start.time" mask="hh:mm A"></q-time>
                           </div>
                         </div>
                       </q-popup-proxy>
                     </q-icon>
                   </template>
                 </q-input>
-                <q-input filled v-model="advanced_reservation_model.end" label="End">
+                <q-input filled v-model="advanced_reservation_model_end.date" label="End">
                   <template v-slot:append>
                     <q-icon name="access_time" class="cursor-pointer">
                       <q-popup-proxy cover>
                         <div class="row q-gutter-md">
                           <div>
-                            <q-date today-btn v-model="advanced_reservation_model.end" mask="YYYY-MM-DD HH:mm"></q-date>
+                            <q-date today-btn v-model="advanced_reservation_model_end.date" mask="YYYY-MM-DD"></q-date>
                           </div>
                           <div>
-                            <q-time now-btn v-model="advanced_reservation_model.end" mask="YYYY-MM-DD HH:mm"></q-time>
+                            <q-time now-btn v-model="advanced_reservation_model_end.time" mask="hh:mm A"></q-time>
                           </div>
                         </div>
                       </q-popup-proxy>
@@ -217,10 +245,48 @@ var TimingComponent = {
                     color="primary"
                     icon-right="add"
                     @click="add_advanced()"
-                    :disable="advanced_reservation_model.disable_add"
+                    :disable="advanced_reservation_model_end.disable_add"
                   >Add</q-btn>
                 </div>
               </div>
+            </q-tab-panel>
+            <q-tab-panel name="periodic">
+              <p>
+                You are adding a periodic timing to this job. 
+                This will run your application for a given duration periodically,
+                until the given end date
+              </p>
+              <div class="q-gutter-md row items-start">
+                <q-input filled v-model="periodic_model.date" label="End time">
+                  <template v-slot:append>
+                    <q-icon name="access_time" class="cursor-pointer">
+                      <q-popup-proxy cover>
+                        <div class="row q-gutter-md">
+                          <div>
+                            <q-date today-btn v-model="periodic_model.date" mask="YYYY-MM-DD"></q-date>
+                          </div>
+                          <div>
+                            <q-time now-btn v-model="periodic_model.time" mask="hh:mm A"></q-time>
+                          </div>
+                        </div>
+                      </q-popup-proxy>
+                    </q-icon>
+                  </template>
+                </q-input>
+                <q-input filled v-model="periodic_model.duration_minutes" label="Duration (minutes)"></q-input>
+                <q-input filled v-model="periodic_model.schedule" label="Cron schedule"></q-input>
+              <div>
+                  <p>
+                    {{ periodic_expires_in_calculation() }}
+                  </p>
+                  <q-btn
+                    color="primary"
+                    icon-right="add"
+                    @click="add_periodic(s)"
+                    :disable="periodic_model.disable_add"
+                  >Add</q-btn>
+                </div>
+              </div> 
             </q-tab-panel>
           </q-tab-panels>
         </q-card-section>
