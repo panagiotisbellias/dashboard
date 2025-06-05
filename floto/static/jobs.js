@@ -265,7 +265,7 @@ createApp({
       table_filter_options,
       selected_table_filter: ref(table_filter_options[0]),
       initialPagination: {
-        rowsPerPage: 0,
+        rowsPerPage: 10,
         descending: true,
         sortBy: 'created_at',
       },

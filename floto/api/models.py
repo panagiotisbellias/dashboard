@@ -364,6 +364,12 @@ class Event(models.Model):
 
     status = models.CharField(max_length=32, choices=Status.choices)
 
+    class Type(models.TextChoices):
+        START = "START"
+        STOP = "STOP"
+
+    type = models.CharField(max_length=32, choices=Type.choices)
+
     class RelatedJobSoftDeleteManager(models.Manager):
         def get_queryset(self):
             return super().get_queryset().filter(timing__job__deleted=None)
