@@ -153,33 +153,48 @@ def delete_namespace_if_exists(namespace_name):
                 raise e
 
 
-def destroy_job(job_obj):
-    for device in job_obj.devices.all():
+def destroy_job(job_obj, device_uuids=None):
+    """
+    Args:
+        job: models.Job
+        device_uuids: [str (device_uuids)]
+    """
+    if device_uuids is None:
+        device_uuids = [
+            device.device_uuid for device in job_obj.devices.all()
+        ]
+    for uuid in device_uuids:
+        destroy_job_for_device(job_obj, uuid)
+
+
+def destroy_job_for_device(job_obj, device_uuid):
+    try:
+        load_config_for_device(device_uuid)
+        batch_api = client.BatchV1Api()
+        core_api = client.CoreV1Api()
+        batch_api.delete_namespaced_job(
+            namespace=get_namespace_name(job_obj.uuid),
+            name=get_job_name(job_obj.uuid, device_uuid),
+            body=client.V1DeleteOptions(
+                propagation_policy="Foreground",
+                grace_period_seconds=0,
+            ),
+        )
+    except client.exceptions.ApiException as e:
+        # Ignore not found, meaning pod was deleted by k8s
+        if e.status != 404:
+            raise e
+    for app_service in job_obj.application.services.all():
+        service = app_service.service
         try:
-            load_config_for_device(device.device_uuid)
-            batch_api = client.BatchV1Api()
-            core_api = client.CoreV1Api()
-            batch_api.delete_namespaced_job(
+            core_api.delete_namespaced_service(
                 namespace=get_namespace_name(job_obj.uuid),
-                name=get_job_name(job_obj.uuid, device.device_uuid),
+                name=get_service_name(device_uuid, service.uuid),
             )
         except client.exceptions.ApiException as e:
             # Ignore not found, meaning pod was deleted by k8s
             if e.status != 404:
                 raise e
-        for app_service in job_obj.application.services.all():
-            service = app_service.service
-            try:
-                core_api.delete_namespaced_service(
-                    namespace=get_namespace_name(job_obj.uuid),
-                    name=get_service_name(device.device_uuid, service.uuid),
-                )
-            except client.exceptions.ApiException as e:
-                # Ignore not found, meaning pod was deleted by k8s
-                if e.status != 404:
-                    raise e
-
-    delete_namespace_if_exists(get_namespace_name(job_obj.uuid))
 
 
 def get_job_logs(uuid):
@@ -356,12 +371,17 @@ def _create_job_for_device(job, device_uuid, job_environment, balena, namespace)
                 # Device is not configured with this option for some reason
                 pass
             config_data[item.label] = value
-    core_api.create_namespaced_config_map(
-        namespace,
-        client.V1ConfigMap(
-            data=config_data, metadata=client.V1ObjectMeta(name=config_name)
-        ),
-    )
+    try:
+        core_api.create_namespaced_config_map(
+            namespace,
+            client.V1ConfigMap(
+                data=config_data, metadata=client.V1ObjectMeta(name=config_name)
+            ),
+        )
+    except client.exceptions.ApiException as e:
+        # Ignore conflict
+        if e.status != 409:
+            raise e
 
     k8s_services = []
     for app_service in job.application.services.all():
@@ -492,8 +512,8 @@ def _create_job_for_device(job, device_uuid, job_environment, balena, namespace)
             td = util.parse_on_demand_args(args)
             v1_job.spec.active_deadline_seconds = int(td.total_seconds())
         elif timing_type == "type=advanced":
-            ts = util.parse_advanced_timing_args(args)
-            td = ts["end"] - ts["start"]
+            ts = util.parse_advanced_timing_args(args)[0]
+            td = ts["stop"] - ts["start"]
             v1_job.spec.active_deadline_seconds = int(td.total_seconds())
 
     batch_api = client.BatchV1Api()

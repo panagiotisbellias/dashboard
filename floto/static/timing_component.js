@@ -63,8 +63,8 @@ var TimingComponent = {
         ctx.emit('update:modelValue', props.modelValue)
       },
       add_periodic() {
-        let end_d = advanced_reservation_model_end.value?.date
-        let end_t = advanced_reservation_model_end.value?.time
+        let end_d = periodic_model.value?.date
+        let end_t = periodic_model.value?.time
         let e = new Date(`${end_d} ${end_t}`).toISOString()
 
         let str = `type=periodic,end=${e},minutes=${periodic_model.value.duration_minutes},schedule=${periodic_model.value.schedule}`

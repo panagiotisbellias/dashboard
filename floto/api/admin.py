@@ -96,7 +96,7 @@ class ApplicationAdmin(SoftDeleteAdmin):
 admin.site.register(models.Application, ApplicationAdmin)
 
 
-class EventInline(nested_admin.NestedStackedInline):
+class EventInline(nested_admin.NestedTabularInline):
     model = models.Event
 
     def has_add_permission(self, request, obj=None):
@@ -119,8 +119,12 @@ class JobDeviceInline(nested_admin.NestedStackedInline):
         return False
 
 
-class DeviceTimeslotInline(nested_admin.NestedStackedInline):
+class DeviceTimeslotInline(nested_admin.NestedTabularInline):
     model = models.DeviceTimeslot
+
+    readonly_fields = [
+        "timing", "category",
+    ]
 
     def has_add_permission(self, request, obj=None):
         return False

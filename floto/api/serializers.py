@@ -184,7 +184,7 @@ class JobDeviceSerializer(serializers.ModelSerializer):
 class EventSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.Event
-        fields = ["status", "time"]
+        fields = ["status", "time", "type"]
 
 
 class JobTimingSerializer(serializers.ModelSerializer):
@@ -223,6 +223,11 @@ class JobSerializer(CreatedByUserSerializer):
             "cleaned_up",
         )
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.context.get('view').action != 'retrieve':
+            self.fields.pop('timeslots')
+
     @transaction.atomic
     def create(self, validated_data):
         devices_data = validated_data.pop("devices")
@@ -244,6 +249,13 @@ class JobSerializer(CreatedByUserSerializer):
                     time=ts["start"],
                     timing=db_timing,
                     status=models.Event.Status.PENDING,
+                    type=models.Event.Type.START,
+                )
+                models.Event.objects.create(
+                    time=ts["stop"],
+                    timing=db_timing,
+                    status=models.Event.Status.PENDING,
+                    type=models.Event.Type.STOP,
                 )
                 # TODO tear down events
 
