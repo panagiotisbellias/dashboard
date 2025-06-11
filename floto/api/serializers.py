@@ -225,8 +225,8 @@ class JobSerializer(CreatedByUserSerializer):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if self.context.get('view').action != 'retrieve':
-            self.fields.pop('timeslots')
+        if self.context.get("view").action != "retrieve":
+            self.fields.pop("timeslots")
 
     @transaction.atomic
     def create(self, validated_data):

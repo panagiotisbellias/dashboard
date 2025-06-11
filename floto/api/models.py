@@ -404,17 +404,25 @@ class KubernetesEvent(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     job = models.ForeignKey(
-        Job, related_name="kubernetes_events", on_delete=models.CASCADE, null=True, blank=True
+        Job,
+        related_name="kubernetes_events",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
     )
     device = models.ForeignKey(
-        DeviceData, related_name="kubernetes_events", on_delete=models.CASCADE, null=True, blank=True
+        DeviceData,
+        related_name="kubernetes_events",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
     )
 
     def __str__(self):
         return f"{self.event_type} - {self.reason} for {self.involved_object_kind}/{self.involved_object_name}"
 
     class Meta:
-        ordering = ['-event_time']
+        ordering = ["-event_time"]
         verbose_name = "Kubernetes Event"
         verbose_name_plural = "Kubernetes Events"
 
@@ -442,7 +450,9 @@ class KubernetesEvent(models.Model):
         elif event.involved_object.kind.lower() == "pod":
             try:
                 # Look up the node for the pod
-                device_pk = kubernetes.get_pod_node(event.involved_object.name, event.metadata.namespace)
+                device_pk = kubernetes.get_pod_node(
+                    event.involved_object.name, event.metadata.namespace
+                )
                 device = DeviceData.objects.get(pk=device_pk)
             except DeviceData.DoesNotExist:
                 device = None
@@ -461,8 +471,8 @@ class KubernetesEvent(models.Model):
             event_time=to_datetime(event.event_time),
             first_timestamp=to_datetime(event.first_timestamp),
             last_timestamp=to_datetime(event.last_timestamp),
-            source_component=getattr(event.source, 'component', None),
-            source_host=getattr(event.source, 'host', None),
+            source_component=getattr(event.source, "component", None),
+            source_host=getattr(event.source, "host", None),
             count=event.count or 1,
             job=job,
             device=device,

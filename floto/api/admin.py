@@ -123,7 +123,8 @@ class DeviceTimeslotInline(nested_admin.NestedTabularInline):
     model = models.DeviceTimeslot
 
     readonly_fields = [
-        "timing", "category",
+        "timing",
+        "category",
     ]
 
     def has_add_permission(self, request, obj=None):
@@ -449,6 +450,20 @@ admin.site.register(models.DownloadEvent, DatasetDownloadEventAdmin)
 
 @admin.register(models.KubernetesEvent)
 class KubernetesEventAdmin(admin.ModelAdmin):
-    list_display = ('namespace', 'created_at', 'event_type', 'reason', 'message', 'count')
-    search_fields = ('reason', 'message', 'involved_object_name', 'job__uuid', 'device__device_uuid', 'namespace')
-    list_filter = ('created_at', 'event_type', 'job', 'device')
+    list_display = (
+        "namespace",
+        "created_at",
+        "event_type",
+        "reason",
+        "message",
+        "count",
+    )
+    search_fields = (
+        "reason",
+        "message",
+        "involved_object_name",
+        "job__uuid",
+        "device__device_uuid",
+        "namespace",
+    )
+    list_filter = ("created_at", "event_type", "job", "device")

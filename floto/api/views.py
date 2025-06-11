@@ -187,7 +187,9 @@ class DeviceViewSet(viewsets.ViewSet):
         return Response(res)
 
     @action(
-        methods=["GET"], detail=True, url_path="events",
+        methods=["GET"],
+        detail=True,
+        url_path="events",
         permission_classes=permission_classes,
     )
     def events(self, request, pk):
