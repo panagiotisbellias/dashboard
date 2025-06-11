@@ -333,6 +333,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "deploy_jobs",
         "schedule": crontab(minute="*/1"),
     },
+    "stop_jobs": {
+        "task": "stop_jobs",
+        "schedule": crontab(minute="*/1"),
+    },
     "cleanup_namespaces": {
         "task": "cleanup_namespaces",
         "schedule": crontab(minute="*/15"),

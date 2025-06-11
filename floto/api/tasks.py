@@ -39,6 +39,7 @@ def cleanup_namespaces():
     Cleanup all jobs that are over in k8s
     """
     for job in Job.objects_all.filter(cleaned_up=False):
+        # TODO should be all events are finished probably...
         # If all timeslots have finished, we can terminate in k8s
         ts = job.timeslots.filter(stop__gte=datetime.now(timezone.utc))
         if not ts:
@@ -153,6 +154,7 @@ def deploy_jobs():
     for event in Event.objects.filter(
         status="PENDING",
         time__lt=datetime.now(),
+        type=Event.Type.START,
     ):
         with transaction.atomic():
             job = event.timing.job
@@ -165,6 +167,33 @@ def deploy_jobs():
                 event.save()
             except Exception as e:
                 LOG.error(f"Error deploy job {job.uuid}:")
+                LOG.error(e)
+                event.status = "ERROR"
+                event.save()
+
+
+@shared_task(name="stop_jobs")
+def stop_jobs():
+    """
+    Stop jobs past their time
+    """
+    for event in Event.objects.filter(
+        status="PENDING",
+        time__lt=datetime.now(),
+        type=Event.Type.STOP,
+    ):
+        with transaction.atomic():
+            job = event.timing.job
+            device_uuids = set([ts.device_uuid for ts in job.timeslots.all()])
+            # TODO this log is wrong, since not all timeslots go to all devices
+            LOG.info(f"Stop {job.uuid} with {len(device_uuids)} devices")
+            try:
+                if not settings.KUBE_READ_ONLY:
+                    kubernetes.destroy_job(job, device_uuids)
+                event.status = "DONE"
+                event.save()
+            except Exception as e:
+                LOG.error(f"Error stopping job {job.uuid}:")
                 LOG.error(e)
                 event.status = "ERROR"
                 event.save()

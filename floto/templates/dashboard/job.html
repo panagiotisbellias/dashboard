@@ -79,7 +79,7 @@
             [[ ts_obj.string ]]
             <ul>
               <li v-for="event in ts_obj.events">
-                [[ event.status === 'DONE' ? 'DEPLOYED' : event.status ]] - [[ event.time ]]
+                [[ event.status === 'DONE' ? 'DEPLOYED' : event.status ]] - [[ event.type ]] - [[ event.time ]]
               </li>
             </ul>
             <p>Scheduled at:</p>
@@ -88,7 +88,7 @@
                 v-for="ts in ts_obj.timeslots"
                 :set="device = devices.find(device => device.uuid == ts.device_uuid)"
               >
-                <span v-if="device">[[ device.device_name ]] </span>
+                <span v-if="device">[[ device.device_name ]]</span>
                 <ul>
                   <li>From [[ ts.start ]]</li>
                   <li>To [[ ts.stop ]]</li>
