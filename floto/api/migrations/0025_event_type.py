@@ -6,14 +6,21 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('floto_api', '0024_alter_application_deleted_alter_collection_deleted_and_more'),
+        (
+            "floto_api",
+            "0024_alter_application_deleted_alter_collection_deleted_and_more",
+        ),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='event',
-            name='type',
-            field=models.CharField(choices=[('START', 'Start'), ('STOP', 'Stop')], default='START', max_length=32),
+            model_name="event",
+            name="type",
+            field=models.CharField(
+                choices=[("START", "Start"), ("STOP", "Stop")],
+                default="START",
+                max_length=32,
+            ),
             preserve_default=False,
         ),
     ]

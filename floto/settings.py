@@ -208,7 +208,7 @@ LOGGING = {
         "pipeline": {"handlers": ["console"], "level": "INFO"},
         "kubernetes": {
             "handlers": ["console"],
-            "level": "INFO",  #LOG_LEVEL_STR,
+            "level": "INFO",  # LOG_LEVEL_STR,
             "propagate": False,
         },
         "urllib3": {

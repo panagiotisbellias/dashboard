@@ -113,8 +113,7 @@ def get_namespaces_with_no_pods():
 
 
 def get_job_events(uuid):
-    """Get events for a job - essentially just wrapped kubeneretes events
-    """
+    """Get events for a job - essentially just wrapped kubeneretes events"""
     events = get_kube_events(uuid)
     sorted(events, key=lambda e: e.first_timestamp)
     return (
@@ -160,9 +159,7 @@ def destroy_job(job_obj, device_uuids=None):
         device_uuids: [str (device_uuids)]
     """
     if device_uuids is None:
-        device_uuids = [
-            device.device_uuid for device in job_obj.devices.all()
-        ]
+        device_uuids = [device.device_uuid for device in job_obj.devices.all()]
     for uuid in device_uuids:
         destroy_job_for_device(job_obj, uuid)
 
@@ -225,13 +222,12 @@ def get_job_logs(uuid):
                 }
             except Exception as e:
                 LOG.exception(e)
-                log_data = {
-                    "error": "Error getting logs for this container."
-                }
+                log_data = {"error": "Error getting logs for this container."}
 
             # Note container.image is not the same as pod.spec.containers[0].image
             # but image_id seems to be a better
             return pod.spec.node_name, container.image, log_data
+
         with futures.ThreadPoolExecutor(max_workers=20) as executor:
             log_futures = [
                 executor.submit(fetch_logs, pod, container)
@@ -271,7 +267,9 @@ def get_pod_health(uuid):
                 try:
                     for k, v in container.state.to_dict().items():
                         if v:
-                            health[pod.spec.node_name]["containers"][container.image_id][k] = v
+                            health[pod.spec.node_name]["containers"][
+                                container.image_id
+                            ][k] = v
                 except Exception:
                     health[pod.spec.node_name]["containers"][container.image_id] = {}
     return health
