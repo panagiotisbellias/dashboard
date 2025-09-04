@@ -1,0 +1,67 @@
+1. Analyze the docker-compose setup / Break down services
+    Identify services: floto (Django), db (MariaDB), redis, celery.
+    Note shared volumes (./media, ./config, ./data, static).
+    Note networks (single external k3d-floto-dev).
+    Note environment variables (.env, MYSQL_*, FLOTO_PORT).
+    Note ports (8080 → FLOTO_PORT).
+2. Decide Helm chart structure (umbrella vs single)
+    Two Options
+        (Recommended) One single app Helm chart with multiple sub-templates/dependencies (Deployment, Service, ConfigMap, PersistentVolumeClaim, etc.).
+            What it is: One chart (floto) that contains your app templates, and declares mariadb + redis as dependencies in Chart.yaml. You control them with values (e.g., mariadb.enabled, redis.enabled).
+            Why it’s safer with changing requirements:
+                If later you move to external/managed DB or Redis, you just set mariadb.enabled=false / redis.enabled=false, and provide external connection settings—no chart split or big refactor.
+                One release to install/upgrade/rollback keeps ops simple during early iterations.
+                Lets you pin dependency versions for predictable upgrades.
+            Best practice fit: Very common when your only custom service is the app, and infra pieces (DB/Redis) are commodity components.
+        Umbrella chart that orchestrates multiple existing stable charts (e.g. bitnami/mariadb, bitnami/redis) and a custom template for floto + celery.
+            What it is: A parent chart with minimal/no templates that depends on several sibling charts (e.g., floto, mariadb, redis)—each its own chart/release unit.
+            When it shines: Large microservice fleets where every service already has its own chart and lifecycle.
+            Trade-offs: Extra maintenance overhead now, and you don’t need the extra indirection unless you already have separate charts per service.
+        Best-practice guardrails
+            Pin dependency versions (don’t float to latest).
+            Expose toggles to use bundled vs external services.
+            Split config vs secrets: put non-sensitive .env keys in a ConfigMap, credentials in a Secret.
+            Avoid bind mounts from compose; use PVCs for media, data, config, and bake the app code into the image (no .:/project).
+            Replace compose networks: Kubernetes networking is Service-based; you won’t recreate k3d-floto-dev.       
+3. Create Helm chart skeleton (Scaffold chart)
+    `helm create floto`
+    This gives a charts/floto/ directory with templates/, values.yaml, etc.
+4. Translate services (Convert each service into Deployment + Service)
+    floto (Django app)
+        Create a Deployment for the web app.
+        Add a Service (ClusterIP or NodePort).
+        Mount ConfigMap/Secret for .env.
+        Mount PersistentVolumeClaims for media, config, static.
+        Add readiness/liveness probes (httpGet → / on $FLOTO_PORT).
+    db (MariaDB)
+        Use bitnami/mariadb subchart OR create your own Deployment + PVC.
+        Store passwords in Secret.
+    redis
+        Use bitnami/redis subchart OR a simple Deployment + Service.
+    celery
+        Create a separate Deployment (or Job if needed).
+        Share volumes/config/env with floto.
+        Depends on DB & Redis → just ensure Service names match.
+5. Handle configuration (Replace .env with ConfigMap/Secret)
+    .env file → turn into ConfigMap (non-sensitive) + Secret (passwords).
+    Environment injection via envFrom.
+6. Handle volumes (Replace local volumes with PVCs.)
+    Replace local mounts (.:/project) with baked image code or a ConfigMap.
+    Replace ./media, ./data, ./config with PersistentVolumeClaims.
+    Define them in values.yaml.
+7. Define services and ingress
+    Expose floto via Service.
+    Optionally add an Ingress (with NGINX/Traefik).
+    Don’t bind 127.0.0.1:8080, use Kubernetes service.
+8. Parameterize via values.yaml
+    Expose all configurable values:
+        image.repository, image.tag
+        db.enabled, db.username, db.password
+        redis.enabled
+        floto.port
+        volumes.persistence.enabled
+        celery.enabled
+9. Test locally on k3d
+    `helm install floto ./charts/floto --values values.yaml`
+    Verify pods, PVCs, services work.
+10. Open PR
