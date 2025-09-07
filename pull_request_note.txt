@@ -13,6 +13,18 @@
                 One release to install/upgrade/rollback keeps ops simple during early iterations.
                 Lets you pin dependency versions for predictable upgrades.
             Best practice fit: Very common when your only custom service is the app, and infra pieces (DB/Redis) are commodity components.
+                    Template tips (how the toggles get used)
+                        In Deployment for web and celery:
+                            If externalDatabase.enabled, point env vars to externalDatabase.host:port; else point to the service DNS from the subchart (e.g., {{ include "mariadb.primary.fullname" . }}).
+                            Same idea for Redis.
+                        Add readiness/liveness probes:
+                            httpGet on / (or a health endpoint) for web.
+                            For celery, use exec probe that checks celery -A floto inspect ping or a lightweight script, or just a liveness on the process while you iterate.
+                        Service: ClusterIP for web; add Ingress if you need external exposure.
+                        PVCs: define media, config, static; mount into containers.
+                    Migration later if requirements change
+                        Move to managed DB/Redis: set mariadb.enabled=false / redis.enabled=false, create Secrets for creds, fill externalDatabase/* and externalRedis/*. No chart refactor.
+                        Need an umbrella chart later: publish floto as its own chart (you already have it), create a tiny umbrella that depends on floto, mariadb, redis. Consumers can switch to the umbrella without changing floto itself.
         Umbrella chart that orchestrates multiple existing stable charts (e.g. bitnami/mariadb, bitnami/redis) and a custom template for floto + celery.
             What it is: A parent chart with minimal/no templates that depends on several sibling charts (e.g., floto, mariadb, redis)—each its own chart/release unit.
             When it shines: Large microservice fleets where every service already has its own chart and lifecycle.
@@ -26,6 +38,25 @@
 3. Create Helm chart skeleton (Scaffold chart)
     `helm create floto`
     This gives a charts/floto/ directory with templates/, values.yaml, etc.
+        Manual Windows Download & Install Helm
+            Go to the Helm releases page: https://github.com/helm/helm/releases
+            Download the latest Windows .zip release.
+            Extract it and put helm.exe somewhere on your machine (e.g. C:\tools\helm\).
+            Add that folder to your system PATH.
+        Verify Installation
+            `helm version`  # This should print the client and server versions.
+        Using Helm in PowerShell
+            ```bash
+            helm repo add bitnami https://charts.bitnami.com/bitnami
+            helm repo update
+            helm search repo nginx
+            helm install my-nginx bitnami/nginx
+            ```
+        Configure Helm to Work with Your Cluster
+            Make sure your kubectl is configured first (e.g. kubectl get nodes works). Helm uses the same kubeconfig file:
+                helm list -A
+            This lists releases across all namespaces.
+                > Setup k3s cluster: Work in progress
 4. Translate services (Convert each service into Deployment + Service)
     floto (Django app)
         Create a Deployment for the web app.
